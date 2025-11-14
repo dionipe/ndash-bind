@@ -651,29 +651,23 @@ ${nsHostname}   IN      A       127.0.0.1
      */
     async enableResolver(options = {}) {
         try {
-            const { settings } = require('../utils/settings');
-            const currentSettings = await settings.loadSettings();
+            console.log('Enabling DNS Resolver with options:', options);
             
-            // Update resolver settings
-            const resolverSettings = {
-                enabled: true,
-                forwarders: options.forwarders || currentSettings.resolver?.forwarders || ['8.8.8.8', '8.8.4.4', '1.1.1.1', '1.0.0.1'],
-                queryLogging: options.queryLogging || currentSettings.resolver?.queryLogging || false,
-                cacheSize: options.cacheSize || currentSettings.resolver?.cacheSize || '256M',
-                dnssecValidation: options.dnssecValidation !== undefined ? options.dnssecValidation : (currentSettings.resolver?.dnssecValidation ?? true)
-            };
-
-            // Update settings
-            await settings.updateSettings({ resolver: resolverSettings });
-
-            // Generate new named.conf.options with resolver enabled
-            await this.generateResolverConfig(resolverSettings);
-
+            // Load current settings
+            const settings = await settingsUtil.loadSettings();
+            
+            // Generate resolver configuration
+            const config = this.generateResolverConfig(settings.resolver);
+            
+            // Write configuration to named.conf.options
+            const configPath = settings.bind.namedConfOptions;
+            await fs.writeFile(configPath, config, 'utf8');
+            
             // Reload Bind to apply changes
             await this.reloadBind();
-
+            
             console.log('✓ DNS Resolver enabled successfully');
-            return { success: true, message: 'DNS Resolver enabled successfully' };
+            return { success: true, message: 'DNS Resolver enabled' };
         } catch (error) {
             console.error('✗ Failed to enable DNS Resolver:', error.message);
             throw new Error(`Failed to enable DNS Resolver: ${error.message}`);
@@ -685,24 +679,23 @@ ${nsHostname}   IN      A       127.0.0.1
      */
     async disableResolver() {
         try {
-            const { settings } = require('../utils/settings');
+            console.log('Disabling DNS Resolver');
             
-            // Update resolver settings
-            await settings.updateSettings({ 
-                resolver: { 
-                    enabled: false,
-                    queryLogging: false
-                } 
-            });
-
-            // Generate named.conf.options without resolver
-            await this.generateBasicConfig();
-
+            // Load current settings
+            const settings = await settingsUtil.loadSettings();
+            
+            // Generate basic configuration (no resolver)
+            const config = this.generateBasicConfig();
+            
+            // Write configuration to named.conf.options
+            const configPath = settings.bind.namedConfOptions;
+            await fs.writeFile(configPath, config, 'utf8');
+            
             // Reload Bind to apply changes
             await this.reloadBind();
-
+            
             console.log('✓ DNS Resolver disabled successfully');
-            return { success: true, message: 'DNS Resolver disabled successfully' };
+            return { success: true, message: 'DNS Resolver disabled' };
         } catch (error) {
             console.error('✗ Failed to disable DNS Resolver:', error.message);
             throw new Error(`Failed to disable DNS Resolver: ${error.message}`);
@@ -710,95 +703,104 @@ ${nsHostname}   IN      A       127.0.0.1
     }
 
     /**
-     * Generate resolver configuration
+     * Generate resolver-enabled named.conf.options
      */
-    async generateResolverConfig(resolverSettings) {
-        const configPath = '/etc/bind/named.conf.options';
-        
+    generateResolverConfig(resolverSettings) {
+        const {
+            forwarders = ['8.8.8.8', '8.8.4.4', '1.1.1.1', '1.0.0.1'],
+            queryLogging = false,
+            cacheSize = '256M',
+            dnssecValidation = true
+        } = resolverSettings;
+
         let config = `options {
-        directory "/var/cache/bind";
+    directory "/var/cache/bind";
 
-        // DNS Resolver Configuration
-        recursion yes;
-        allow-recursion { any; };
-        allow-query { any; };
-        allow-query-cache { any; };
+    // DNS Resolver Configuration
+    recursion yes;
+    allow-recursion { any; };
+    allow-query { any; };
+    allow-query-cache { any; };
 
-        // Forwarders for external resolution
-        forwarders {
+    // Forwarders
+    forwarders {
 `;
 
         // Add forwarders
-        resolverSettings.forwarders.forEach(forwarder => {
-            config += `                ${forwarder};\n`;
+        forwarders.forEach(forwarder => {
+            config += `        ${forwarder};\n`;
         });
 
-        config += `        };
-        // forward only;  // Commented out to allow direct resolution if forwarders fail
+        config += `    };
+    forward only;
 
-        // Query logging
-        ${resolverSettings.queryLogging ? 'querylog yes;' : '// querylog yes;  // Disabled'}
+    // DNSSEC
+    dnssec-validation ${dnssecValidation ? 'auto' : 'no'};
 
-        // DNSSEC
-        dnssec-validation ${resolverSettings.dnssecValidation ? 'auto' : 'no'};
-
-        // Performance tuning
-        max-cache-size ${resolverSettings.cacheSize};
-        max-cache-ttl 86400;
-        max-ncache-ttl 3600;
-
-        // Statistics
-        statistics-file "/var/cache/bind/named.stats";
-        zone-statistics yes;
-
-        // Listen on all interfaces
-        listen-on { any; };
-        listen-on-v6 { any; };
-};
+    // Query Logging
 `;
 
-        // Write configuration
-        const fs = require('fs').promises;
-        await fs.writeFile(configPath, config, 'utf8');
-        console.log('✓ Resolver configuration generated');
+        if (queryLogging) {
+            config += `    querylog yes;
+`;
+        }
+
+        config += `
+    // Cache Size
+    max-cache-size ${cacheSize};
+
+    // Additional options
+    listen-on port 53 { any; };
+    listen-on-v6 port 53 { any; };
+
+    // Disable version queries for security
+    version none;
+
+    // Rate limiting
+    rate-limit {
+        responses-per-second 5;
+        window 5;
+    };
+};
+
+`;
+
+        return config;
     }
 
     /**
-     * Generate basic configuration (no resolver)
+     * Generate basic named.conf.options (no resolver)
      */
-    async generateBasicConfig() {
-        const configPath = '/etc/bind/named.conf.options';
-        const config = `options {
-        directory "/var/cache/bind";
+    generateBasicConfig() {
+        return `options {
+    directory "/var/cache/bind";
 
-        // Basic DNS Configuration (Resolver Disabled)
-        recursion no;
-        allow-recursion { none; };
-        allow-query { any; };
-        allow-query-cache { none; };
+    // Authoritative-only configuration (no resolver)
+    recursion no;
+    allow-recursion { none; };
+    allow-query { any; };
+    allow-query-cache { none; };
 
-        // DNSSEC
-        dnssec-validation auto;
+    // No forwarders - direct resolution only
 
-        // Performance tuning
-        max-cache-size 256M;
-        max-cache-ttl 86400;
-        max-ncache-ttl 3600;
+    // DNSSEC disabled for authoritative mode
+    dnssec-validation no;
 
-        // Statistics
-        statistics-file "/var/cache/bind/named.stats";
-        zone-statistics yes;
+    // No query logging
+    // querylog no;
 
-        // Listen on all interfaces
-        listen-on { any; };
-        listen-on-v6 { any; };
+    // Minimal cache
+    max-cache-size 64M;
+
+    // Additional options
+    listen-on port 53 { any; };
+    listen-on-v6 port 53 { any; };
+
+    // Disable version queries for security
+    version none;
 };
-`;
 
-        // Write configuration
-        const fs = require('fs').promises;
-        await fs.writeFile(configPath, config, 'utf8');
-        console.log('✓ Basic configuration generated (resolver disabled)');
+`;
     }
 
     /**
