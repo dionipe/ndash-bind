@@ -17,6 +17,13 @@ const DEFAULT_SETTINGS = {
         zonesPath: '/etc/bind/zones',
         namedConfLocal: '/etc/bind/named.conf.local',
         namedConfOptions: '/etc/bind/named.conf.options'
+    },
+    resolver: {
+        enabled: false,
+        forwarders: ['8.8.8.8', '8.8.4.4', '1.1.1.1', '1.0.0.1'],
+        queryLogging: false,
+        cacheSize: '256M',
+        dnssecValidation: true
     }
 };
 
@@ -71,6 +78,10 @@ async function updateSettings(updates) {
         bind: {
             ...currentSettings.bind,
             ...updates.bind
+        },
+        resolver: {
+            ...currentSettings.resolver,
+            ...updates.resolver
         }
     };
     await saveSettings(newSettings);

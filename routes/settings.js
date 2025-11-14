@@ -37,27 +37,50 @@ router.get('/', async (req, res) => {
 // Update settings
 router.post('/', async (req, res) => {
     try {
-        const { autoReload, validateBeforeReload, backupEnabled, autoGeneratePTR } = req.body;
+        const { 
+            autoReload, validateBeforeReload, backupEnabled, autoGeneratePTR,
+            enableResolver, queryLogging, dnssecValidation, cacheSize, forwarders
+        } = req.body;
         
         console.log('Received POST data:', req.body);
-        console.log('autoReload:', autoReload, '=', autoReload === 'on');
-        console.log('validateBeforeReload:', validateBeforeReload, '=', validateBeforeReload === 'on');
-        console.log('backupEnabled:', backupEnabled, '=', backupEnabled === 'on');
-        console.log('autoGeneratePTR:', autoGeneratePTR, '=', autoGeneratePTR === 'on');
         
-        // Update settings
+        // Update zone settings
+        const zoneUpdates = {
+            autoReload: autoReload === 'on',
+            validateBeforeReload: validateBeforeReload === 'on',
+            backupEnabled: backupEnabled === 'on',
+            autoGeneratePTR: autoGeneratePTR === 'on'
+        };
+        
+        // Update resolver settings
+        const resolverUpdates = {
+            enabled: enableResolver === 'on',
+            queryLogging: queryLogging === 'on',
+            dnssecValidation: dnssecValidation === 'on',
+            cacheSize: cacheSize || '256M'
+        };
+        
+        // Handle forwarders (comma-separated string to array)
+        if (forwarders) {
+            resolverUpdates.forwarders = forwarders.split(',').map(f => f.trim()).filter(f => f);
+        }
+        
         const updates = {
-            zones: {
-                autoReload: autoReload === 'on',
-                validateBeforeReload: validateBeforeReload === 'on',
-                backupEnabled: backupEnabled === 'on',
-                autoGeneratePTR: autoGeneratePTR === 'on'
-            }
+            zones: zoneUpdates,
+            resolver: resolverUpdates
         };
         
         await settingsUtil.updateSettings(updates);
         
-        console.log('✓ Settings updated:', updates.zones);
+        // Apply resolver configuration if enabled/disabled
+        const bindService = require('../services/bindService');
+        if (enableResolver === 'on') {
+            await bindService.enableResolver(resolverUpdates);
+        } else {
+            await bindService.disableResolver();
+        }
+        
+        console.log('✓ Settings updated:', updates);
         res.redirect('/settings?success=' + encodeURIComponent('Settings updated successfully'));
     } catch (error) {
         console.error('Error updating settings:', error);

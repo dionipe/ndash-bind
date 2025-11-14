@@ -140,6 +140,9 @@ async function getStatisticsData() {
         moment(a.timestamp).isAfter(moment().subtract(30, 'days'))
     ).length;
 
+    // Top queried domains
+    const topQueriedDomains = await getTopQueriedDomains();
+
     return {
         zoneStats,
         recordStats: {
@@ -154,8 +157,57 @@ async function getStatisticsData() {
         growth: {
             zonesLastMonth: lastMonthZones,
             recordsLastMonth: lastMonthRecords
-        }
+        },
+        topQueriedDomains
     };
+}
+
+// Helper function to parse query logs and get top queried domains
+async function getTopQueriedDomains(limit = 10) {
+    try {
+        const fs = require('fs').promises;
+        const path = require('path');
+        
+        const queryLogPath = '/var/log/bind/query.log';
+        
+        // Check if query log exists
+        try {
+            await fs.access(queryLogPath);
+        } catch (error) {
+            return []; // Return empty array if log doesn't exist yet
+        }
+        
+        // Read query log
+        const logContent = await fs.readFile(queryLogPath, 'utf8');
+        const lines = logContent.split('\n').filter(line => line.trim());
+        
+        // Parse queries from log
+        const domainCounts = {};
+        
+        lines.forEach(line => {
+            // Parse BIND query log format
+            // Example: 14-Nov-2025 10:30:15.123 queries: info: client @0x7f8b8c0d8e90 192.168.1.100#54321 (google.com): query: google.com IN A + (192.168.1.1)
+            const queryMatch = line.match(/queries:\s+info:\s+.*?\(([^)]+)\):/);
+            if (queryMatch) {
+                const domain = queryMatch[1].toLowerCase();
+                // Skip our own zones
+                if (!domain.includes('dionipe.id') && !domain.includes('dionipe.net') && !domain.includes('in-addr.arpa')) {
+                    domainCounts[domain] = (domainCounts[domain] || 0) + 1;
+                }
+            }
+        });
+        
+        // Convert to array and sort by count
+        const topDomains = Object.entries(domainCounts)
+            .map(([domain, count]) => ({ domain, queries: count }))
+            .sort((a, b) => b.queries - a.queries)
+            .slice(0, limit);
+        
+        return topDomains;
+    } catch (error) {
+        console.error('Error parsing query logs:', error);
+        return [];
+    }
 }
 
 module.exports = router;
