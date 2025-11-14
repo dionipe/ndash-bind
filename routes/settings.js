@@ -3,34 +3,20 @@ const router = express.Router();
 const fs = require('fs-extra');
 const path = require('path');
 const config = require('../config');
+const settingsUtil = require('../utils/settings');
 
 // Get settings page
 router.get('/', async (req, res) => {
     try {
-        // Read current Bind configuration
-        const namedConf = await fs.readFile('/etc/bind/named.conf.options', 'utf8');
+        // Load current settings
+        const settings = await settingsUtil.loadSettings();
         
-        // Parse some basic settings
-        const settings = {
-            bind: {
-                version: 'Bind 9.18.28',
-                configPath: '/etc/bind',
-                zonesPath: config.bind.zonesPath,
-                namedConfLocal: '/etc/bind/named.conf.local',
-                namedConfOptions: '/etc/bind/named.conf.options',
-            },
-            server: {
-                port: 3000,
-                nodeVersion: process.version,
-                platform: process.platform,
-                uptime: Math.floor(process.uptime()),
-            },
-            zones: {
-                autoReload: true,
-                validateBeforeReload: true,
-                backupEnabled: true,
-                autoGeneratePTR: true,
-            }
+        // Add server info
+        settings.server = {
+            port: 3000,
+            nodeVersion: process.version,
+            platform: process.platform,
+            uptime: Math.floor(process.uptime()),
         };
 
         res.render('settings/index', {
@@ -51,11 +37,21 @@ router.get('/', async (req, res) => {
 // Update settings
 router.post('/', async (req, res) => {
     try {
-        const { zonesPath, autoReload, validateBeforeReload, backupEnabled } = req.body;
+        const { autoReload, validateBeforeReload, backupEnabled, autoGeneratePTR } = req.body;
         
-        // Here you can implement actual settings update
-        // For now, we'll just show success message
+        // Update settings
+        const updates = {
+            zones: {
+                autoReload: autoReload === 'on',
+                validateBeforeReload: validateBeforeReload === 'on',
+                backupEnabled: backupEnabled === 'on',
+                autoGeneratePTR: autoGeneratePTR === 'on'
+            }
+        };
         
+        await settingsUtil.updateSettings(updates);
+        
+        console.log('✓ Settings updated:', updates.zones);
         res.redirect('/settings?success=' + encodeURIComponent('Settings updated successfully'));
     } catch (error) {
         console.error('Error updating settings:', error);

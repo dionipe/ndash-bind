@@ -1,0 +1,15 @@
+{
+  "zones": {
+    "autoReload": true,
+    "validateBeforeReload": true,
+    "backupEnabled": true,
+    "autoGeneratePTR": true
+  },
+  "bind": {
+    "version": "Bind 9.18.28",
+    "configPath": "/etc/bind",
+    "zonesPath": "/etc/bind/zones",
+    "namedConfLocal": "/etc/bind/named.conf.local",
+    "namedConfOptions": "/etc/bind/named.conf.options"
+  }
+}

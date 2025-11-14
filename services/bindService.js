@@ -5,6 +5,7 @@ const util = require('util');
 const execPromise = util.promisify(exec);
 const config = require('../config');
 const bindConfig = require('../utils/bindConfig');
+const settingsUtil = require('../utils/settings');
 
 /**
  * Bind Service - Handles all interactions with Bind DNS server
@@ -112,6 +113,10 @@ class BindService {
     async createZone(data) {
         try {
             const zoneName = data.name || data.zoneName;
+            
+            // Load settings to check if auto-reload is enabled
+            const settings = await settingsUtil.loadSettings();
+            
             const options = {
                 type: data.type || 'master',
                 nameserver: data.nameserver || `ns1.${zoneName}.`,
@@ -129,8 +134,18 @@ class BindService {
                 throw new Error(`Zone ${zoneName} already exists`);
             }
             
+            // Pass settings to zone generator
+            options.settings = settings;
+            
             // Generate zone file content
             const zoneContent = this.generateZoneFile(zoneName, options);
+            
+            // Backup if enabled
+            if (settings.zones.backupEnabled) {
+                const backupDir = path.join(this.zonesPath, 'backups');
+                await fs.ensureDir(backupDir);
+                console.log(`✓ Backup enabled - directory ready: ${backupDir}`);
+            }
             
             // Write zone file
             await fs.writeFile(zoneFile, zoneContent, 'utf8');
@@ -140,8 +155,13 @@ class BindService {
             await bindConfig.addZoneToConfig(zoneName, zoneFile);
             console.log(`✓ Added zone to named.conf.local`);
             
-            // Reload Bind
-            await this.reloadBind();
+            // Reload Bind if auto-reload is enabled
+            if (settings.zones.autoReload) {
+                await this.reloadBind();
+                console.log(`✓ Auto-reload enabled - Bind reloaded`);
+            } else {
+                console.log(`⚠ Auto-reload disabled - Manual reload required`);
+            }
             
             return {
                 success: true,
@@ -159,8 +179,18 @@ class BindService {
      */
     async addRecord(zoneName, record) {
         try {
+            // Load settings
+            const settings = await settingsUtil.loadSettings();
+            
             const { zone } = await this.getZone(zoneName);
             const zoneFile = zone.file;
+            
+            // Backup if enabled
+            if (settings.zones.backupEnabled) {
+                const backupFile = `${zoneFile}.backup.${Date.now()}`;
+                await fs.copy(zoneFile, backupFile);
+                console.log(`✓ Backup created: ${backupFile}`);
+            }
             
             // Read current zone file
             let zoneContent = await fs.readFile(zoneFile, 'utf8');
@@ -178,11 +208,17 @@ class BindService {
             await fs.writeFile(zoneFile, zoneContent, 'utf8');
             console.log(`✓ Added record to ${zoneName}`);
             
-            // Check zone syntax
-            await this.checkZone(zoneName, zoneFile);
+            // Check zone syntax if validation is enabled
+            if (settings.zones.validateBeforeReload) {
+                await this.checkZone(zoneName, zoneFile);
+                console.log(`✓ Zone validation passed`);
+            }
             
-            // Reload Bind
-            await this.reloadBind();
+            // Reload Bind if auto-reload is enabled
+            if (settings.zones.autoReload) {
+                await this.reloadBind();
+                console.log(`✓ Auto-reload enabled - Bind reloaded`);
+            }
             
             return { success: true };
         } catch (error) {
@@ -195,8 +231,18 @@ class BindService {
      */
     async deleteRecord(zoneName, recordName, recordType) {
         try {
+            // Load settings
+            const settings = await settingsUtil.loadSettings();
+            
             const { zone } = await this.getZone(zoneName);
             const zoneFile = zone.file;
+            
+            // Backup if enabled
+            if (settings.zones.backupEnabled) {
+                const backupFile = `${zoneFile}.backup.${Date.now()}`;
+                await fs.copy(zoneFile, backupFile);
+                console.log(`✓ Backup created: ${backupFile}`);
+            }
             
             // Read current zone file
             let zoneContent = await fs.readFile(zoneFile, 'utf8');
@@ -228,8 +274,11 @@ class BindService {
             await fs.writeFile(zoneFile, zoneContent, 'utf8');
             console.log(`✓ Deleted record from ${zoneName}`);
             
-            // Reload Bind
-            await this.reloadBind();
+            // Reload Bind if auto-reload is enabled
+            if (settings.zones.autoReload) {
+                await this.reloadBind();
+                console.log(`✓ Auto-reload enabled - Bind reloaded`);
+            }
             
             return { success: true };
         } catch (error) {
@@ -242,8 +291,18 @@ class BindService {
      */
     async updateRecord(zoneName, oldRecord, newRecord) {
         try {
+            // Load settings
+            const settings = await settingsUtil.loadSettings();
+            
             const { zone } = await this.getZone(zoneName);
             const zoneFile = zone.file;
+            
+            // Backup if enabled
+            if (settings.zones.backupEnabled) {
+                const backupFile = `${zoneFile}.backup.${Date.now()}`;
+                await fs.copy(zoneFile, backupFile);
+                console.log(`✓ Backup created: ${backupFile}`);
+            }
             
             // Read current zone file
             let zoneContent = await fs.readFile(zoneFile, 'utf8');
@@ -284,11 +343,17 @@ class BindService {
             await fs.writeFile(zoneFile, zoneContent, 'utf8');
             console.log(`✓ Updated record in ${zoneName}`);
             
-            // Check zone syntax
-            await this.checkZone(zoneName, zoneFile);
+            // Check zone syntax if validation is enabled
+            if (settings.zones.validateBeforeReload) {
+                await this.checkZone(zoneName, zoneFile);
+                console.log(`✓ Zone validation passed`);
+            }
             
-            // Reload Bind
-            await this.reloadBind();
+            // Reload Bind if auto-reload is enabled
+            if (settings.zones.autoReload) {
+                await this.reloadBind();
+                console.log(`✓ Auto-reload enabled - Bind reloaded`);
+            }
             
             return { success: true };
         } catch (error) {
@@ -301,12 +366,15 @@ class BindService {
      */
     async deleteZone(zoneName) {
         try {
+            // Load settings
+            const settings = await settingsUtil.loadSettings();
+            
             const { zone } = await this.getZone(zoneName);
             
             // Remove from named.conf.local
             await bindConfig.removeZoneFromConfig(zoneName);
             
-            // Backup zone file before deleting
+            // Backup zone file before deleting (always backup on delete)
             const backupFile = `${zone.file}.backup.${Date.now()}`;
             await fs.copy(zone.file, backupFile);
             console.log(`✓ Backed up zone file to ${backupFile}`);
@@ -315,27 +383,32 @@ class BindService {
             await fs.remove(zone.file);
             console.log(`✓ Deleted zone file`);
             
-            // Validate config before reload
-            try {
-                const { exec } = require('child_process');
-                await new Promise((resolve, reject) => {
-                    exec('named-checkconf', (error, stdout, stderr) => {
-                        if (error) {
-                            reject(new Error(`Config validation failed: ${stderr || error.message}`));
-                        } else {
-                            resolve();
-                        }
+            // Validate config before reload if enabled
+            if (settings.zones.validateBeforeReload) {
+                try {
+                    const { exec } = require('child_process');
+                    await new Promise((resolve, reject) => {
+                        exec('named-checkconf', (error, stdout, stderr) => {
+                            if (error) {
+                                reject(new Error(`Config validation failed: ${stderr || error.message}`));
+                            } else {
+                                resolve();
+                            }
+                        });
                     });
-                });
-                console.log(`✓ Config validated successfully`);
-            } catch (validationError) {
-                // Restore backup if validation fails
-                console.error(`✗ Config validation failed, attempting to restore...`);
-                throw validationError;
+                    console.log(`✓ Config validated successfully`);
+                } catch (validationError) {
+                    // Restore backup if validation fails
+                    console.error(`✗ Config validation failed, attempting to restore...`);
+                    throw validationError;
+                }
             }
             
-            // Reload Bind
-            await this.reloadBind();
+            // Reload Bind if auto-reload is enabled
+            if (settings.zones.autoReload) {
+                await this.reloadBind();
+                console.log(`✓ Auto-reload enabled - Bind reloaded`);
+            }
             
             return { success: true };
         } catch (error) {
@@ -397,12 +470,23 @@ $TTL ${ttl}
             const firstOctet = networkPrefix.split('.')[0];
             zoneContent += `${ns}   IN      A       ${networkPrefix}.${firstOctet}\n`;
             
-            // Auto-generate PTR records for IPs 1-254
-            zoneContent += `\n; PTR records (auto-generated)\n`;
-            zoneContent += `; Format: <last-octet> IN PTR <hostname>.<domain>\n`;
-            for (let i = 1; i <= 254; i++) {
-                const hostname = `host${i}`;
-                zoneContent += `${i}       IN      PTR     ${hostname}.${domainForPTR}\n`;
+            // Auto-generate PTR records only if enabled in settings
+            const autoGeneratePTR = options.settings?.zones?.autoGeneratePTR !== false;
+            
+            if (autoGeneratePTR) {
+                // Auto-generate PTR records for IPs 1-254
+                zoneContent += `\n; PTR records (auto-generated)\n`;
+                zoneContent += `; Format: <last-octet> IN PTR <hostname>.<domain>\n`;
+                for (let i = 1; i <= 254; i++) {
+                    const hostname = `host${i}`;
+                    zoneContent += `${i}       IN      PTR     ${hostname}.${domainForPTR}\n`;
+                }
+                console.log(`✓ Auto-generated 254 PTR records`);
+            } else {
+                zoneContent += `\n; PTR records\n`;
+                zoneContent += `; Add your PTR records here\n`;
+                zoneContent += `; Example: 1 IN PTR host1.${domainForPTR}\n`;
+                console.log(`⚠ Auto-generate PTR disabled - Empty template created`);
             }
         } else {
             // For forward zones, add standard A records
