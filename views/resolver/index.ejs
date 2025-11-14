@@ -1,0 +1,446 @@
+<%- include('../partials/header-standalone') %>
+
+<div class="mb-6 flex items-center justify-between">
+    <div>
+        <h3 class="text-2xl font-bold text-gray-800">DNS Resolver Statistics</h3>
+        <p class="text-gray-600 mt-1">Comprehensive analytics for DNS resolver performance and usage</p>
+    </div>
+    <div class="flex items-center space-x-3">
+        <button onclick="refreshStats()" class="btn-sm btn-primary">
+            <i class="fas fa-sync-alt mr-1" id="refresh-icon"></i>
+            Refresh
+        </button>
+        <a href="/settings" class="btn-sm btn-outline">
+            <i class="fas fa-cog mr-1"></i>
+            Settings
+        </a>
+    </div>
+</div>
+
+<% if (resolverEnabled) { %>
+    <!-- Resolver Status Banner -->
+    <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center">
+                <i class="fas fa-check-circle text-green-600 mr-3 text-xl"></i>
+                <div>
+                    <h4 class="text-green-800 font-medium">DNS Resolver Active</h4>
+                    <p class="text-sm text-green-600">Resolver is enabled and processing external DNS queries</p>
+                </div>
+            </div>
+            <div class="text-right">
+                <p class="text-xs text-gray-500">Last updated</p>
+                <p class="text-sm text-gray-700"><%= new Date(resolverStats.lastUpdated).toLocaleString() %></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Statistics Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <!-- Left Column (2/3) -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Query Statistics -->
+            <div class="content-card">
+                <h4 class="text-lg font-semibold text-gray-800 mb-4">
+                    <i class="fas fa-chart-bar mr-2 text-blue-600"></i>
+                    Query Statistics
+                </h4>
+
+                <!-- Query Metrics -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="p-4 bg-blue-50 rounded-lg text-center">
+                        <p class="text-3xl font-bold text-blue-600"><%= resolverStats.queryStats.totalQueries %></p>
+                        <p class="text-sm text-gray-600 mt-1">Total Queries</p>
+                        <p class="text-xs text-gray-500 mt-1"><%= resolverStats.queryStats.timeRange %></p>
+                    </div>
+                    <div class="p-4 bg-purple-50 rounded-lg text-center">
+                        <p class="text-3xl font-bold text-purple-600"><%= resolverStats.queryStats.queriesPerSecond %></p>
+                        <p class="text-sm text-gray-600 mt-1">Queries/sec</p>
+                        <p class="text-xs text-gray-500 mt-1">Average Rate</p>
+                    </div>
+                    <div class="p-4 bg-green-50 rounded-lg text-center">
+                        <p class="text-3xl font-bold text-green-600"><%= resolverStats.cacheStats.cacheHitRate %></p>
+                        <p class="text-sm text-gray-600 mt-1">Cache Hit Rate</p>
+                        <p class="text-xs text-gray-500 mt-1">Efficiency</p>
+                    </div>
+                    <div class="p-4 bg-orange-50 rounded-lg text-center">
+                        <p class="text-3xl font-bold text-orange-600"><%= resolverStats.cacheStats.totalCacheOperations %></p>
+                        <p class="text-sm text-gray-600 mt-1">Cache Operations</p>
+                        <p class="text-xs text-gray-500 mt-1">Total</p>
+                    </div>
+                </div>
+
+                <!-- Query Types Breakdown -->
+                <% if (Object.keys(resolverStats.queryStats.queryTypes).length > 0) { %>
+                    <div class="mb-6">
+                        <h5 class="font-medium text-gray-700 mb-3">Query Types Distribution</h5>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            <% Object.entries(resolverStats.queryStats.queryTypes).slice(0, 6).forEach(([type, count]) => { %>
+                                <div class="p-3 bg-gray-50 rounded-lg">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span class="text-sm font-medium text-gray-600"><%= type %></span>
+                                        <span class="text-sm text-gray-800 font-bold"><%= count %></span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                        <% const percentage = ((count / resolverStats.queryStats.totalQueries) * 100).toFixed(1); %>
+                                        <div class="bg-blue-600 h-2 rounded-full" style="width: <%= percentage %>%"></div>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-1"><%= percentage %>%</p>
+                                </div>
+                            <% }); %>
+                        </div>
+                    </div>
+                <% } %>
+
+                <!-- Cache Performance Details -->
+                <div class="grid grid-cols-2 gap-6">
+                    <div>
+                        <h5 class="font-medium text-gray-700 mb-3 flex items-center">
+                            <i class="fas fa-database mr-2 text-green-600"></i>
+                            Cache Performance
+                        </h5>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center p-3 bg-green-50 rounded">
+                                <span class="text-sm text-gray-600">Cache Hits</span>
+                                <span class="text-sm font-bold text-green-700"><%= resolverStats.cacheStats.cacheHits %></span>
+                            </div>
+                            <div class="flex justify-between items-center p-3 bg-red-50 rounded">
+                                <span class="text-sm text-gray-600">Cache Misses</span>
+                                <span class="text-sm font-bold text-red-700"><%= resolverStats.cacheStats.cacheMisses %></span>
+                            </div>
+                            <div class="flex justify-between items-center p-3 bg-blue-50 rounded">
+                                <span class="text-sm text-gray-600">Hit Rate</span>
+                                <span class="text-sm font-bold text-blue-700"><%= resolverStats.cacheStats.cacheHitRate %></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h5 class="font-medium text-gray-700 mb-3 flex items-center">
+                            <i class="fas fa-server mr-2 text-indigo-600"></i>
+                            Forwarder Configuration
+                        </h5>
+                        <div class="p-4 bg-indigo-50 rounded-lg">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm text-gray-600">Configured Forwarders</span>
+                                <span class="text-sm font-medium text-indigo-600"><%= resolverStats.forwarderStats.configuredForwarders %></span>
+                            </div>
+                            <% if (resolverStats.forwarderStats.forwarders && resolverStats.forwarderStats.forwarders.length > 0) { %>
+                                <div class="flex flex-wrap gap-2 mt-2">
+                                    <% resolverStats.forwarderStats.forwarders.forEach(forwarder => { %>
+                                        <span class="px-2 py-1 text-xs bg-indigo-100 text-indigo-800 rounded">
+                                            <%= forwarder %>
+                                        </span>
+                                    <% }); %>
+                                </div>
+                            <% } %>
+                            <% if (resolverStats.forwarderStats.note) { %>
+                                <p class="text-xs text-gray-500 mt-2"><%= resolverStats.forwarderStats.note %></p>
+                            <% } %>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Queried Domains -->
+            <% if (topQueriedDomains && topQueriedDomains.length > 0) { %>
+                <div class="content-card">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-4">
+                        <i class="fas fa-search mr-2 text-yellow-600"></i>
+                        Top Queried Domains
+                    </h4>
+
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full table-auto">
+                            <thead>
+                                <tr class="bg-gray-50">
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Domain</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Queries</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Percentage</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <% const totalDomainQueries = topQueriedDomains.reduce((sum, domain) => sum + domain.queries, 0); %>
+                                <% topQueriedDomains.forEach((domain, index) => { %>
+                                    <tr class="<%= index % 2 === 0 ? 'bg-white' : 'bg-gray-50' %>">
+                                        <td class="px-4 py-3 whitespace-nowrap">
+                                            <span class="text-sm font-medium text-gray-900">#<%= index + 1 %></span>
+                                        </td>
+                                        <td class="px-4 py-3 whitespace-nowrap">
+                                            <span class="text-sm text-gray-900"><%= domain.domain %></span>
+                                        </td>
+                                        <td class="px-4 py-3 whitespace-nowrap">
+                                            <span class="text-sm font-medium text-gray-900"><%= domain.queries %></span>
+                                        </td>
+                                        <td class="px-4 py-3 whitespace-nowrap">
+                                            <% const percentage = ((domain.queries / totalDomainQueries) * 100).toFixed(1); %>
+                                            <div class="flex items-center">
+                                                <div class="w-full bg-gray-200 rounded-full h-2 mr-2">
+                                                    <div class="bg-yellow-600 h-2 rounded-full" style="width: <%= percentage %>%"></div>
+                                                </div>
+                                                <span class="text-sm text-gray-600"><%= percentage %>%</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <% }); %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            <% } %>
+
+            <!-- Response Time Analysis -->
+            <% if (resolverStats.responseStats && resolverStats.responseStats.sampleSize > 0) { %>
+                <div class="content-card">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-4">
+                        <i class="fas fa-clock mr-2 text-purple-600"></i>
+                        Response Time Analysis
+                    </h4>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="p-4 bg-purple-50 rounded-lg text-center">
+                            <p class="text-2xl font-bold text-purple-600"><%= resolverStats.responseStats.averageResponseTime %></p>
+                            <p class="text-sm text-gray-600 mt-1">Average Response Time</p>
+                        </div>
+                        <div class="p-4 bg-green-50 rounded-lg text-center">
+                            <p class="text-2xl font-bold text-green-600"><%= resolverStats.responseStats.minResponseTime %></p>
+                            <p class="text-sm text-gray-600 mt-1">Min Response Time</p>
+                        </div>
+                        <div class="p-4 bg-red-50 rounded-lg text-center">
+                            <p class="text-2xl font-bold text-red-600"><%= resolverStats.responseStats.maxResponseTime %></p>
+                            <p class="text-sm text-gray-600 mt-1">Max Response Time</p>
+                        </div>
+                    </div>
+
+                    <div class="text-sm text-gray-600">
+                        <p>Sample size: <%= resolverStats.responseStats.sampleSize %> queries</p>
+                    </div>
+                </div>
+            <% } %>
+        </div>
+
+        <!-- Right Column (1/3) -->
+        <div class="space-y-6">
+            <!-- Resolver Configuration -->
+            <div class="content-card">
+                <h4 class="text-lg font-semibold text-gray-800 mb-4">
+                    <i class="fas fa-cogs mr-2 text-gray-600"></i>
+                    Resolver Configuration
+                </h4>
+
+                <div class="space-y-4">
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-sm text-gray-600">Status</span>
+                            <span class="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">Enabled</span>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-sm text-gray-600">Query Logging</span>
+                            <span class="px-2 py-1 text-xs <%= resolverConfig.queryLogging ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800' %> rounded-full">
+                                <%= resolverConfig.queryLogging ? 'Enabled' : 'Disabled' %>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-sm text-gray-600">DNSSEC Validation</span>
+                            <span class="px-2 py-1 text-xs <%= resolverConfig.dnssecValidation ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' %> rounded-full">
+                                <%= resolverConfig.dnssecValidation ? 'Enabled' : 'Disabled' %>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-gray-50 rounded-lg">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-sm text-gray-600">Cache Size</span>
+                            <span class="text-sm font-medium text-gray-800"><%= resolverConfig.cacheSize %></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="content-card">
+                <h4 class="text-lg font-semibold text-gray-800 mb-4">
+                    <i class="fas fa-bolt mr-2 text-yellow-600"></i>
+                    Quick Actions
+                </h4>
+
+                <div class="space-y-3">
+                    <button onclick="clearCache()" class="w-full btn-sm btn-outline">
+                        <i class="fas fa-trash mr-2"></i>
+                        Clear DNS Cache
+                    </button>
+                    <button onclick="reloadBind()" class="w-full btn-sm btn-outline">
+                        <i class="fas fa-sync-alt mr-2"></i>
+                        Reload Bind
+                    </button>
+                    <a href="/logs?type=query" class="w-full btn-sm btn-outline inline-block text-center">
+                        <i class="fas fa-file-alt mr-2"></i>
+                        View Query Logs
+                    </a>
+                </div>
+            </div>
+
+            <!-- Real-time Updates -->
+            <div class="content-card">
+                <h4 class="text-lg font-semibold text-gray-800 mb-4">
+                    <i class="fas fa-tachometer-alt mr-2 text-blue-600"></i>
+                    Real-time Updates
+                </h4>
+
+                <div class="text-center">
+                    <div class="inline-flex items-center px-3 py-2 bg-blue-50 text-blue-700 rounded-lg">
+                        <i class="fas fa-circle text-green-500 mr-2 animate-pulse"></i>
+                        <span class="text-sm">Auto-refresh enabled</span>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">Updates every 30 seconds</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<% } else { %>
+    <!-- Resolver Disabled State -->
+    <div class="max-w-2xl mx-auto">
+        <div class="p-12 text-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+            <i class="fas fa-globe text-6xl text-gray-400 mb-6"></i>
+            <h3 class="text-2xl font-medium text-gray-600 mb-4">DNS Resolver Disabled</h3>
+            <p class="text-gray-500 mb-6 max-w-md mx-auto">
+                <%= error ? error : 'The DNS resolver is currently disabled. Enable it in Settings to view comprehensive resolver statistics and analytics.' %>
+            </p>
+            <div class="flex justify-center space-x-4">
+                <a href="/settings" class="btn btn-primary">
+                    <i class="fas fa-cog mr-2"></i>
+                    Go to Settings
+                </a>
+                <a href="/statistics" class="btn btn-outline">
+                    <i class="fas fa-chart-bar mr-2"></i>
+                    View Zone Statistics
+                </a>
+            </div>
+        </div>
+    </div>
+<% } %>
+
+<script>
+// Auto-refresh functionality
+let refreshInterval;
+
+function startAutoRefresh() {
+    refreshInterval = setInterval(() => {
+        refreshStats();
+    }, 30000); // Refresh every 30 seconds
+}
+
+function stopAutoRefresh() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+    }
+}
+
+async function refreshStats() {
+    const refreshIcon = document.getElementById('refresh-icon');
+    refreshIcon.classList.add('fa-spin');
+
+    try {
+        const response = await fetch('/resolver/api/data');
+        const result = await response.json();
+
+        if (result.success) {
+            // Update the page with new data
+            location.reload();
+        } else {
+            showNotification('Failed to refresh statistics', 'error');
+        }
+    } catch (error) {
+        console.error('Error refreshing stats:', error);
+        showNotification('Error refreshing statistics', 'error');
+    } finally {
+        refreshIcon.classList.remove('fa-spin');
+    }
+}
+
+async function clearCache() {
+    if (!confirm('Are you sure you want to clear the DNS cache? This will temporarily reduce performance.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/bind/clear-cache', { method: 'POST' });
+        const result = await response.json();
+
+        if (result.success) {
+            showNotification('DNS cache cleared successfully', 'success');
+            setTimeout(() => refreshStats(), 1000);
+        } else {
+            showNotification('Failed to clear cache: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showNotification('Error clearing cache', 'error');
+    }
+}
+
+async function reloadBind() {
+    if (!confirm('Are you sure you want to reload Bind? This may cause temporary service interruption.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/bind/reload', { method: 'POST' });
+        const result = await response.json();
+
+        if (result.success) {
+            showNotification('Bind reloaded successfully', 'success');
+            setTimeout(() => refreshStats(), 2000);
+        } else {
+            showNotification('Failed to reload Bind: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showNotification('Error reloading Bind', 'error');
+    }
+}
+
+function showNotification(message, type = 'info') {
+    const colors = {
+        success: 'bg-green-500',
+        error: 'bg-red-500',
+        warning: 'bg-yellow-500',
+        info: 'bg-blue-500'
+    };
+
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 ${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg z-50`;
+    notification.innerHTML = `<i class="fas fa-info-circle mr-2"></i>${message}`;
+
+    document.body.appendChild(notification);
+
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transition = 'opacity 0.5s';
+        setTimeout(() => notification.remove(), 500);
+    }, 3000);
+}
+
+// Start auto-refresh when page loads
+<% if (resolverEnabled) { %>
+document.addEventListener('DOMContentLoaded', startAutoRefresh);
+<% } %>
+</script>
+
+<style>
+.content-card {
+    background: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    padding: 1.5rem;
+    border: 1px solid #e5e7eb;
+}
+</style>
+
+<%- include('../partials/footer-standalone') %>

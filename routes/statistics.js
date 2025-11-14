@@ -210,4 +210,178 @@ async function getTopQueriedDomains(limit = 10) {
     }
 }
 
+// Helper function to get resolver statistics
+async function getResolverStatistics() {
+    try {
+        const fs = require('fs').promises;
+        const settingsUtil = require('../utils/settings');
+
+        // Get resolver settings
+        const settings = await settingsUtil.loadSettings();
+        const resolverEnabled = settings.resolver?.enabled || false;
+
+        if (!resolverEnabled) {
+            return {
+                enabled: false,
+                message: 'DNS Resolver is currently disabled'
+            };
+        }
+
+        // Query statistics from logs
+        const queryStats = await getQueryStatistics();
+
+        // Cache statistics (if available)
+        const cacheStats = await getCacheStatistics();
+
+        // Forwarder statistics
+        const forwarderStats = await getForwarderStatistics();
+
+        return {
+            enabled: true,
+            queryStats,
+            cacheStats,
+            forwarderStats,
+            lastUpdated: new Date().toISOString()
+        };
+    } catch (error) {
+        console.error('Error getting resolver statistics:', error);
+        return {
+            enabled: false,
+            error: error.message
+        };
+    }
+}
+
+// Helper function to get query statistics
+async function getQueryStatistics() {
+    try {
+        const fs = require('fs').promises;
+        const queryLogPath = '/var/log/bind/query.log';
+
+        // Check if query log exists
+        try {
+            await fs.access(queryLogPath);
+        } catch (error) {
+            return {
+                totalQueries: 0,
+                queriesPerSecond: 0,
+                queryTypes: {},
+                timeRange: 'No query logs available'
+            };
+        }
+
+        // Read query log
+        const logContent = await fs.readFile(queryLogPath, 'utf8');
+        const lines = logContent.split('\n').filter(line => line.trim());
+
+        // Parse queries from last hour
+        const oneHourAgo = Date.now() - (60 * 60 * 1000);
+        const recentQueries = [];
+        const queryTypes = {};
+
+        lines.forEach(line => {
+            // Parse BIND query log format
+            const queryMatch = line.match(/(\d{2}-\w{3}-\d{4} \d{2}:\d{2}:\d{2}\.\d{3}) queries:\s+info:\s+.*?\(([^)]+)\):\s+query:\s+([^)]+)\s+(\w+)\s+\+.*?\(([^)]+)\)/);
+            if (queryMatch) {
+                const timestamp = new Date(queryMatch[1]).getTime();
+                const domain = queryMatch[2];
+                const queryType = queryMatch[4];
+                const client = queryMatch[5];
+
+                if (timestamp > oneHourAgo) {
+                    recentQueries.push({
+                        timestamp,
+                        domain,
+                        type: queryType,
+                        client
+                    });
+
+                    // Count query types
+                    queryTypes[queryType] = (queryTypes[queryType] || 0) + 1;
+                }
+            }
+        });
+
+        const totalQueries = recentQueries.length;
+        const queriesPerSecond = totalQueries / 3600; // Average over last hour
+
+        return {
+            totalQueries,
+            queriesPerSecond: queriesPerSecond.toFixed(2),
+            queryTypes,
+            timeRange: 'Last hour'
+        };
+    } catch (error) {
+        console.error('Error getting query statistics:', error);
+        return {
+            totalQueries: 0,
+            queriesPerSecond: 0,
+            queryTypes: {},
+            timeRange: 'Error reading logs'
+        };
+    }
+}
+
+// Helper function to get cache statistics
+async function getCacheStatistics() {
+    try {
+        const { exec } = require('child_process');
+        const util = require('util');
+        const execPromise = util.promisify(exec);
+
+        // Get cache statistics from rndc
+        const { stdout } = await execPromise('rndc stats');
+        const statsPath = '/var/cache/bind/named.stats';
+
+        // Read stats file
+        const fs = require('fs').promises;
+        const statsContent = await fs.readFile(statsPath, 'utf8');
+
+        // Parse cache statistics
+        const cacheHits = statsContent.match(/Cache Hits\s+(\d+)/)?.[1] || 0;
+        const cacheMisses = statsContent.match(/Cache Misses\s+(\d+)/)?.[1] || 0;
+        const totalCacheOps = parseInt(cacheHits) + parseInt(cacheMisses);
+        const cacheHitRate = totalCacheOps > 0 ? ((parseInt(cacheHits) / totalCacheOps) * 100).toFixed(1) : 0;
+
+        return {
+            cacheHits: parseInt(cacheHits),
+            cacheMisses: parseInt(cacheMisses),
+            cacheHitRate: `${cacheHitRate}%`,
+            totalCacheOperations: totalCacheOps
+        };
+    } catch (error) {
+        console.error('Error getting cache statistics:', error);
+        return {
+            cacheHits: 0,
+            cacheMisses: 0,
+            cacheHitRate: '0%',
+            totalCacheOperations: 0,
+            error: 'Cache statistics not available'
+        };
+    }
+}
+
+// Helper function to get forwarder statistics
+async function getForwarderStatistics() {
+    try {
+        const settingsUtil = require('../utils/settings');
+        const settings = await settingsUtil.loadSettings();
+
+        const forwarders = settings.resolver?.forwarders || [];
+
+        return {
+            configuredForwarders: forwarders.length,
+            forwarders: forwarders,
+            note: 'Detailed forwarder usage requires additional logging configuration'
+        };
+    } catch (error) {
+        console.error('Error getting forwarder statistics:', error);
+        return {
+            configuredForwarders: 0,
+            forwarders: [],
+            error: error.message
+        };
+    }
+}
+
 module.exports = router;
