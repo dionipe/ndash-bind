@@ -29,7 +29,12 @@
         "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
         "http://pgl.yoyo.org/adservers/serverlist.php?hostformat=bindconfig&showintro=0&mimetype=plaintext",
         "https://raw.githubusercontent.com/oznu/dns-zone-blacklist/master/bind/bind-nxdomain.blacklist",
-        "https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt"
+        "https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt",
+        "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/rpz/pro.txt",
+        "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/rpz/tif.txt",
+        "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/rpz/fake.txt",
+        "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/rpz/popupads.txt",
+        "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/rpz/spam-tlds-rpz.txt"
       ],
       "redirectTo": "0.0.0.0",
       "customDomains": [

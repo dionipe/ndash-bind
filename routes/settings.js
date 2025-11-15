@@ -54,6 +54,7 @@ router.post('/', async (req, res) => {
             enableResolver, queryLogging, dnssecValidation, cacheSize, forwarders,
             enableAdblock, adblockUrls, adblockRedirect, customAdblockDomains,
             enableWildcardAdblock, wildcardAdblockDomains,
+            enableHageziPro, enableHageziTif, enableHageziFake, enableHageziPopup, enableHageziTlds,
             enableDoH, dohPort, dohCertPath, dohKeyPath,
             enableDoT, dotPort, dotCertPath, dotKeyPath
         } = req.body;
@@ -79,7 +80,42 @@ router.post('/', async (req, res) => {
             cacheSize: cacheSize || currentSettings.resolver?.cacheSize || '256M',
             adblock: {
                 enabled: enableAdblock !== undefined ? enableAdblock === 'on' : currentSettings.resolver?.adblock?.enabled || false,
-                blocklistUrls: adblockUrls ? adblockUrls.split('\n').map(url => url.trim()).filter(url => url) : currentSettings.resolver?.adblock?.blocklistUrls || ['https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts'],
+                blocklistUrls: (() => {
+                    // Start with base blocklists
+                    let urls = [];
+                    
+                    // Add traditional blocklists if provided
+                    if (adblockUrls) {
+                        urls = urls.concat(adblockUrls.split('\n').map(url => url.trim()).filter(url => url));
+                    } else if (currentSettings.resolver?.adblock?.blocklistUrls) {
+                        // Filter out hagezi URLs from existing list to rebuild
+                        urls = currentSettings.resolver.adblock.blocklistUrls.filter(url => 
+                            !url.includes('hagezi/dns-blocklists')
+                        );
+                    }
+                    
+                    // Add hagezi blocklists based on toggles
+                    const hageziUrls = {
+                        pro: 'https://raw.githubusercontent.com/hagezi/dns-blocklists/main/rpz/pro.txt',
+                        tif: 'https://raw.githubusercontent.com/hagezi/dns-blocklists/main/rpz/tif.txt',
+                        fake: 'https://raw.githubusercontent.com/hagezi/dns-blocklists/main/rpz/fake.txt',
+                        popup: 'https://raw.githubusercontent.com/hagezi/dns-blocklists/main/rpz/popupads.txt',
+                        tlds: 'https://raw.githubusercontent.com/hagezi/dns-blocklists/main/rpz/spam-tlds-rpz.txt'
+                    };
+                    
+                    if (enableHageziPro === 'on') urls.push(hageziUrls.pro);
+                    if (enableHageziTif === 'on') urls.push(hageziUrls.tif);
+                    if (enableHageziFake === 'on') urls.push(hageziUrls.fake);
+                    if (enableHageziPopup === 'on') urls.push(hageziUrls.popup);
+                    if (enableHageziTlds === 'on') urls.push(hageziUrls.tlds);
+                    
+                    // Ensure we have at least one URL
+                    if (urls.length === 0) {
+                        urls.push('https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts');
+                    }
+                    
+                    return urls;
+                })(),
                 redirectTo: adblockRedirect || currentSettings.resolver?.adblock?.redirectTo || '0.0.0.0',
                 customDomains: customAdblockDomains ? customAdblockDomains.split('\n').map(d => d.trim()).filter(d => d) : currentSettings.resolver?.adblock?.customDomains || [],
                 wildcardEnabled: enableWildcardAdblock !== undefined ? enableWildcardAdblock === 'on' : currentSettings.resolver?.adblock?.wildcardEnabled || false,
