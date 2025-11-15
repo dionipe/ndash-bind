@@ -1,4 +1,10 @@
-<aside class="w-64 bg-gradient-to-b from-gray-900 to-gray-800 text-white flex flex-col shadow-xl">
+<aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-gray-900 to-gray-800 text-white flex flex-col shadow-xl transform -translate-x-full lg:translate-x-0 lg:static lg:inset-0 transition-transform duration-300 ease-in-out">
+    <!-- Close button for mobile -->
+    <div class="lg:hidden p-4 border-b border-gray-700">
+        <button onclick="toggleMobileMenu()" class="text-gray-400 hover:text-white float-right">
+            <i class="fas fa-times text-xl"></i>
+        </button>
+    </div>
     <!-- Logo Section -->
     <div class="p-6 border-b border-gray-700">
         <div class="flex items-center space-x-3">

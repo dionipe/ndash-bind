@@ -663,6 +663,22 @@ ${nsHostname}   IN      A       127.0.0.1
             const configPath = settings.bind.namedConfOptions;
             await fs.writeFile(configPath, config, 'utf8');
             
+            // Handle adblock zone if enabled
+            if (settings.resolver.adblock?.enabled) {
+                // Setup single adblock zone
+                await this.setupAdblockZone(settings.resolver.adblock);
+            } else {
+                await this.removeAdblockZone();
+            }
+            
+            // Start encrypted DNS services if enabled
+            const encryptedDnsService = require('./encryptedDnsService');
+            if (settings.resolver.doh?.enabled || settings.resolver.dot?.enabled) {
+                await encryptedDnsService.start();
+            } else {
+                await encryptedDnsService.stop();
+            }
+            
             // Reload Bind to apply changes
             await this.reloadBind();
             
@@ -691,6 +707,16 @@ ${nsHostname}   IN      A       127.0.0.1
             const configPath = settings.bind.namedConfOptions;
             await fs.writeFile(configPath, config, 'utf8');
             
+            // Stop encrypted DNS services
+            const encryptedDnsService = require('./encryptedDnsService');
+            await encryptedDnsService.stop();
+            
+            // Remove adblock zones
+            await this.removeAdblockZone();
+            
+            // Clear named.conf.local to ensure clean state
+            await fs.writeFile('/etc/bind/named.conf.local', '', 'utf8');
+            
             // Reload Bind to apply changes
             await this.reloadBind();
             
@@ -710,7 +736,8 @@ ${nsHostname}   IN      A       127.0.0.1
             forwarders = ['8.8.8.8', '8.8.4.4', '1.1.1.1', '1.0.0.1'],
             queryLogging = false,
             cacheSize = '256M',
-            dnssecValidation = true
+            dnssecValidation = true,
+            adblock = { enabled: false }
         } = resolverSettings;
 
         let config = `options {
@@ -761,7 +788,19 @@ ${nsHostname}   IN      A       127.0.0.1
         responses-per-second 5;
         window 5;
     };
-};
+`;
+
+        // Add RPZ configuration for adblock if enabled
+        if (adblock.enabled) {
+            config += `
+    // Response Policy Zone for Adblock
+    response-policy {
+        zone "adblock";
+    };
+`;
+        }
+
+        config += `};
 
 `;
 
@@ -838,6 +877,290 @@ ${nsHostname}   IN      A       127.0.0.1
                 status: 'error',
                 error: error.message
             };
+        }
+    }
+
+    /**
+     * Setup adblock RPZ zone
+     */
+    async setupAdblockZone(adblockSettings) {
+        try {
+            console.log('Setting up adblock zone with settings:', adblockSettings);
+            
+            const zoneName = 'adblock';
+            const zoneFile = `/etc/bind/zones/${zoneName}.db`;
+            
+            // Generate RPZ zone content
+            const zoneContent = await this.generateAdblockZoneContent(adblockSettings);
+            
+            // Write zone file
+            await fs.writeFile(zoneFile, zoneContent, 'utf8');
+            
+            // Add zone to named.conf.local if not already present
+            await this.addAdblockZoneToConfig(zoneName, zoneFile);
+            
+            console.log('✓ Adblock zone setup successfully');
+        } catch (error) {
+            console.error('✗ Failed to setup adblock zone:', error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * Remove adblock RPZ zone
+     */
+    async removeAdblockZone() {
+        try {
+            console.log('Removing adblock zone');
+            
+            const zoneName = 'adblock';
+            const zoneFile = `/etc/bind/zones/${zoneName}.db`;
+            
+            // Remove zone file if exists
+            try {
+                await fs.unlink(zoneFile);
+            } catch (error) {
+                // Ignore if file doesn't exist
+            }
+            
+            // Remove zone from named.conf.local
+            await this.removeAdblockZoneFromConfig(zoneName);
+            
+            console.log('✓ Adblock zone removed successfully');
+        } catch (error) {
+            console.error('✗ Failed to remove adblock zone:', error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * Generate adblock RPZ zone content
+     */
+    async generateAdblockZoneContent(adblockSettings) {
+        const { blocklistUrls = [], blocklistUrl, customDomains = [], wildcardDomains = [], redirectTo = '0.0.0.0', wildcardEnabled = false } = adblockSettings;
+        
+        // Support both old single URL and new multiple URLs format
+        const urls = Array.isArray(blocklistUrls) && blocklistUrls.length > 0 ? blocklistUrls : 
+                    (blocklistUrl ? [blocklistUrl] : []);
+        
+        let zoneContent = `\$TTL 86400
+@ IN SOA localhost. root.localhost. (
+    2024111401 ; serial
+    3600       ; refresh
+    1800       ; retry
+    604800     ; expire
+    86400      ; minimum
+)
+@ IN NS localhost.
+
+; Adblock RPZ zone - redirects blocked domains to ${redirectTo}
+`;
+
+        // Add custom domains
+        customDomains.forEach(domain => {
+            if (domain.trim()) {
+                zoneContent += `${domain} IN CNAME ${redirectTo}.\n`;
+            }
+        });
+
+        // Add wildcard domains if enabled
+        if (wildcardEnabled && wildcardDomains.length > 0) {
+            wildcardDomains.forEach(pattern => {
+                if (pattern.trim()) {
+                    // RPZ wildcard format: *.domain.com
+                    const wildcardPattern = pattern.startsWith('*.') ? pattern : `*.${pattern}`;
+                    zoneContent += `${wildcardPattern} IN CNAME ${redirectTo}.\n`;
+                }
+            });
+        }
+
+        // Try to fetch blocklist from URL
+        try {
+            const https = require('https');
+            const { URL } = require('url');
+            
+            const fetchBlocklist = (urlString) => {
+                return new Promise((resolve, reject) => {
+                    const parsedUrl = new URL(urlString);
+                    const options = {
+                        hostname: parsedUrl.hostname,
+                        path: parsedUrl.pathname + parsedUrl.search,
+                        method: 'GET',
+                        headers: {
+                            'User-Agent': 'NDash-Adblock/1.0'
+                        }
+                    };
+                    
+                    const req = https.request(options, (res) => {
+                        let data = '';
+                        res.on('data', (chunk) => {
+                            data += chunk;
+                        });
+                        res.on('end', () => {
+                            resolve(data);
+                        });
+                    });
+                    
+                    req.on('error', (error) => {
+                        reject(error);
+                    });
+                    
+                    req.setTimeout(10000, () => {
+                        req.destroy();
+                        reject(new Error('Request timeout'));
+                    });
+                    
+                    req.end();
+                });
+            };
+            
+            // Fetch from all URLs and combine results
+            const blockedDomains = new Set();
+            
+            for (const url of urls) {
+                try {
+                    console.log(`Fetching adblock list from: ${url}`);
+                    const blocklistData = await fetchBlocklist(url);
+                    
+                    // Parse blocklist based on format
+                    const lines = blocklistData.split('\n');
+                    
+                    // Check if it's BIND config format (contains "zone" declarations)
+                    const isBindFormat = lines.some(line => line.includes('zone "') && line.includes('" {'));
+                    
+                    // Check if it's AdBlock Plus format (contains "||" and "^")
+                    const isAdblockFormat = lines.some(line => line.includes('||') && line.includes('^'));
+                    
+                    if (isBindFormat) {
+                        // Parse BIND config format
+                        console.log(`Detected BIND config format for ${url}`);
+                        lines.forEach(line => {
+                            const trimmed = line.trim();
+                            if (trimmed && trimmed.startsWith('zone "') && trimmed.includes('" {')) {
+                                // Extract domain from: zone "domain.com" { ...
+                                const match = trimmed.match(/zone "([^"]+)"/);
+                                if (match && match[1]) {
+                                    const domain = match[1].toLowerCase();
+                                    if (domain && domain !== 'localhost' && !domain.includes('local')) {
+                                        blockedDomains.add(domain);
+                                    }
+                                }
+                            }
+                        });
+                    } else if (isAdblockFormat) {
+                        // Parse AdBlock Plus format
+                        console.log(`Detected AdBlock Plus format for ${url}`);
+                        lines.forEach(line => {
+                            const trimmed = line.trim();
+                            if (trimmed && !trimmed.startsWith('!') && !trimmed.startsWith('[')) {
+                                // Handle ||domain^ format
+                                if (trimmed.startsWith('||') && trimmed.endsWith('^')) {
+                                    const domain = trimmed.slice(2, -1).toLowerCase(); // Remove || and ^
+                                    if (domain && domain !== 'localhost' && !domain.includes('local')) {
+                                        blockedDomains.add(domain);
+                                    }
+                                }
+                                // Handle |domain^ format
+                                else if (trimmed.startsWith('|') && trimmed.endsWith('^') && !trimmed.startsWith('||')) {
+                                    const domain = trimmed.slice(1, -1).toLowerCase(); // Remove | and ^
+                                    if (domain && domain !== 'localhost' && !domain.includes('local')) {
+                                        blockedDomains.add(domain);
+                                    }
+                                }
+                            }
+                        });
+                    } else {
+                        // Parse hosts file format
+                        console.log(`Detected hosts file format for ${url}`);
+                        lines.forEach(line => {
+                            const trimmed = line.trim();
+                            if (trimmed && !trimmed.startsWith('#')) {
+                                const parts = trimmed.split(/\s+/);
+                                if (parts.length >= 2 && (parts[0] === '0.0.0.0' || parts[0] === '127.0.0.1')) {
+                                    const domain = parts[1].toLowerCase();
+                                    if (domain && domain !== 'localhost' && !domain.includes('local')) {
+                                        blockedDomains.add(domain);
+                                    }
+                                }
+                            }
+                        });
+                    }
+                    
+                } catch (error) {
+                    console.warn(`Failed to fetch adblock list from ${url}:`, error.message);
+                    // Continue with other URLs
+                }
+            }
+            
+            // Add fetched domains to zone (limit to prevent huge files)
+            const domainsArray = Array.from(blockedDomains).slice(0, 50000); // Limit to 50k domains
+            domainsArray.forEach(domain => {
+                zoneContent += `${domain} IN CNAME ${redirectTo}.\n`;
+            });
+            
+            console.log(`Added ${domainsArray.length} domains from ${urls.length} blocklist sources`);
+        } catch (error) {
+            console.warn('Failed to fetch adblock lists:', error.message);
+        }
+
+        return zoneContent;
+    }
+
+    /**
+     * Add adblock zone to named.conf.local
+     */
+    async addAdblockZoneToConfig(zoneName, zoneFile) {
+        const configPath = '/etc/bind/named.conf.local';
+        let configContent = '';
+        
+        try {
+            configContent = await fs.readFile(configPath, 'utf8');
+        } catch (error) {
+            // File doesn't exist, create it
+            configContent = '';
+        }
+        
+        // Check if zone already exists
+        if (configContent.includes(`zone "${zoneName}"`)) {
+            return; // Already exists
+        }
+        
+        // Add zone configuration
+        const zoneConfig = `
+// Adblock RPZ Zone
+zone "${zoneName}" {
+    type master;
+    file "${zoneFile}";
+    allow-query { any; };
+};
+`;
+        
+        configContent += zoneConfig;
+        await fs.writeFile(configPath, configContent, 'utf8');
+    }
+
+    /**
+     * Remove adblock zone from named.conf.local
+     */
+    async removeAdblockZoneFromConfig(zoneName) {
+        const configPath = '/etc/bind/named.conf.local';
+        
+        try {
+            let configContent = await fs.readFile(configPath, 'utf8');
+            
+            // Remove zone configuration with proper regex
+            const zoneRegex = new RegExp(`\\n// Adblock RPZ Zone\\nzone "${zoneName}" \\{[^}]*\\};\\n`, 'g');
+            configContent = configContent.replace(zoneRegex, '\n');
+            
+            // Clean up any extra whitespace
+            configContent = configContent.trim();
+            if (configContent === '') {
+                configContent = '';
+            }
+            
+            await fs.writeFile(configPath, configContent, 'utf8');
+        } catch (error) {
+            // Ignore if file doesn't exist or zone not found
         }
     }
 }

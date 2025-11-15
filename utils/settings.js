@@ -23,7 +23,27 @@ const DEFAULT_SETTINGS = {
         forwarders: ['8.8.8.8', '8.8.4.4', '1.1.1.1', '1.0.0.1'],
         queryLogging: false,
         cacheSize: '256M',
-        dnssecValidation: true
+        dnssecValidation: true,
+        adblock: {
+            enabled: false,
+            blocklistUrls: ['https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts'],
+            customDomains: [],
+            redirectTo: '0.0.0.0',
+            wildcardEnabled: false,
+            wildcardDomains: []
+        },
+        doh: {
+            enabled: false,
+            port: 443,
+            certPath: '/etc/ssl/certs/ndash.crt',
+            keyPath: '/etc/ssl/private/ndash.key'
+        },
+        dot: {
+            enabled: false,
+            port: 853,
+            certPath: '/etc/ssl/certs/ndash.crt',
+            keyPath: '/etc/ssl/private/ndash.key'
+        }
     }
 };
 

@@ -1,8 +1,8 @@
 {
   "zones": {
     "autoReload": true,
-    "validateBeforeReload": true,
-    "backupEnabled": true,
+    "validateBeforeReload": false,
+    "backupEnabled": false,
     "autoGeneratePTR": true
   },
   "bind": {
@@ -16,12 +16,43 @@
     "enabled": true,
     "forwarders": [
       "8.8.8.8",
-      "8.8.4.4",
       "1.1.1.1",
-      "1.0.0.1"
+      "94.140.14.14",
+      "94.140.15.15"
     ],
-    "queryLogging": true,
+    "queryLogging": false,
     "cacheSize": "256M",
-    "dnssecValidation": true
+    "dnssecValidation": true,
+    "adblock": {
+      "enabled": true,
+      "blocklistUrls": [
+        "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
+        "http://pgl.yoyo.org/adservers/serverlist.php?hostformat=bindconfig&showintro=0&mimetype=plaintext",
+        "https://raw.githubusercontent.com/oznu/dns-zone-blacklist/master/bind/bind-nxdomain.blacklist",
+        "https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt"
+      ],
+      "redirectTo": "0.0.0.0",
+      "customDomains": [
+        "wzb.eu"
+      ],
+      "wildcardEnabled": true,
+      "wildcardDomains": [
+        "*.hereyourhotlady.com",
+        "*.sweetkissesclub.com",
+        "*.sweetxladies.com"
+      ]
+    },
+    "doh": {
+      "enabled": true,
+      "port": 443,
+      "certPath": "/etc/ssl/certs/ndash.crt",
+      "keyPath": "/etc/ssl/private/ndash.key"
+    },
+    "dot": {
+      "enabled": true,
+      "port": 853,
+      "certPath": "/etc/ssl/certs/ndash.crt",
+      "keyPath": "/etc/ssl/private/ndash.key"
+    }
   }
 }

@@ -218,6 +218,213 @@
                            placeholder="8.8.8.8, 8.8.4.4, 1.1.1.1, 1.0.0.1">
                     <p class="text-xs text-gray-600 mt-1">Comma-separated list of DNS forwarders</p>
                 </div>
+
+                <!-- Adblock Settings -->
+                <div class="border-t pt-4 mt-4">
+                    <h4 class="text-md font-semibold text-gray-800 mb-3">Adblock Settings</h4>
+                    
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
+                            <div>
+                                <p class="text-sm font-medium text-gray-700">Enable Adblock</p>
+                                <p class="text-xs text-gray-600">Block ads and tracking domains</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" name="enableAdblock" class="sr-only peer" <%= settings.resolver?.adblock?.enabled ? 'checked' : '' %>>
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+                            </label>
+                        </div>
+                        
+                        <div class="p-3 bg-gray-50 rounded">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Blocklist URLs</label>
+                            <textarea name="adblockUrls" rows="3" 
+                                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                                      placeholder="https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts&#10;https://p2.fqdn.im/downloads/list.txt&#10;https://example.com/blocklist.txt"><%= settings.resolver?.adblock?.blocklistUrls ? settings.resolver.adblock.blocklistUrls.join('\n') : 'https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts' %></textarea>
+                            <p class="text-xs text-gray-600 mt-1">URLs to fetch adblock domain lists (one per line)</p>
+                        </div>
+                        
+                        <div class="p-3 bg-gray-50 rounded">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Redirect To</label>
+                            <input type="text" name="adblockRedirect" 
+                                   value="<%= settings.resolver?.adblock?.redirectTo || '0.0.0.0' %>" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                                   placeholder="0.0.0.0">
+                            <p class="text-xs text-gray-600 mt-1">IP address to redirect blocked domains to</p>
+                        </div>
+                        
+                        <div class="p-3 bg-gray-50 rounded">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Custom Domains</label>
+                            <textarea name="customAdblockDomains" rows="3" 
+                                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                                      placeholder="example.com&#10;ads.domain.com&#10;tracking.site.com"><%= settings.resolver?.adblock?.customDomains ? settings.resolver.adblock.customDomains.join('\n') : '' %></textarea>
+                            <p class="text-xs text-gray-600 mt-1">Additional domains to block (one per line)</p>
+                        </div>
+                        
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
+                            <div>
+                                <p class="text-sm font-medium text-gray-700">Enable Wildcard Blocking</p>
+                                <p class="text-xs text-gray-600">Block domains using wildcard patterns (*.example.com)</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" name="enableWildcardAdblock" class="sr-only peer" <%= settings.resolver?.adblock?.wildcardEnabled ? 'checked' : '' %>>
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+                            </label>
+                        </div>
+                        
+                        <div class="p-3 bg-gray-50 rounded">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Wildcard Domains</label>
+                            <textarea name="wildcardAdblockDomains" rows="3" 
+                                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                                      placeholder="*.ads.example.com&#10;*.tracking.domain.com"><%= settings.resolver?.adblock?.wildcardDomains ? settings.resolver.adblock.wildcardDomains.join('\n') : '' %></textarea>
+                            <p class="text-xs text-gray-600 mt-1">Wildcard patterns to block (one per line)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SSL Certificate Management -->
+                <div class="border-t pt-4 mt-4">
+                    <h4 class="text-md font-semibold text-gray-800 mb-3">SSL Certificate Management</h4>
+
+                    <div class="space-y-3">
+                        <div class="p-3 bg-yellow-50 rounded border-l-4 border-yellow-400">
+                            <div class="flex items-center justify-between mb-3">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-700">SSL Certificate Status</p>
+                                    <p class="text-xs text-gray-600" id="ssl-status">Loading...</p>
+                                </div>
+                                <button type="button" class="btn btn-secondary btn-sm" id="check-ssl-btn">
+                                    <i class="fas fa-sync-alt mr-1"></i>
+                                    Check Status
+                                </button>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Common Name</label>
+                                    <input type="text" id="ssl-common-name"
+                                           value="localhost"
+                                           class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                                           placeholder="localhost">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Organization</label>
+                                    <input type="text" id="ssl-organization"
+                                           value="NDash DNS Server"
+                                           class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                                           placeholder="Your Organization">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Country Code</label>
+                                    <input type="text" id="ssl-country"
+                                           value="US"
+                                           class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                                           placeholder="US" maxlength="2">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Validity (Days)</label>
+                                    <input type="number" id="ssl-validity"
+                                           value="365"
+                                           class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                                           min="30" max="3650">
+                                </div>
+                            </div>
+
+                            <div class="mt-3 flex gap-2">
+                                <button type="button" class="btn btn-success btn-sm" id="generate-ssl-btn">
+                                    <i class="fas fa-certificate mr-1"></i>
+                                    Generate Self-Signed SSL
+                                </button>
+                                <button type="button" class="btn btn-danger btn-sm" id="delete-ssl-btn" style="display: none;">
+                                    <i class="fas fa-trash mr-1"></i>
+                                    Delete Certificates
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DoH/DoT Settings -->
+                <div class="border-t pt-4 mt-4">
+                    <h4 class="text-md font-semibold text-gray-800 mb-3">Encrypted DNS Settings</h4>
+                    
+                    <div class="space-y-3">
+                        <!-- DoH Settings -->
+                        <div class="p-3 bg-blue-50 rounded border-l-4 border-blue-400">
+                            <div class="flex items-center justify-between mb-3">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-700">DNS over HTTPS (DoH)</p>
+                                    <p class="text-xs text-gray-600">Encrypt DNS queries over HTTPS</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" name="enableDoH" class="sr-only peer" <%= settings.resolver?.doh?.enabled ? 'checked' : '' %>>
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Port</label>
+                                    <input type="number" name="dohPort" 
+                                           value="<%= settings.resolver?.doh?.port || 443 %>" 
+                                           class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                           min="1" max="65535">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Certificate Path</label>
+                                    <input type="text" name="dohCertPath" 
+                                           value="<%= settings.resolver?.doh?.certPath || '/etc/ssl/certs/doh.crt' %>" 
+                                           class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                           placeholder="/path/to/cert.pem">
+                                </div>
+                                <div class="col-span-2">
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Private Key Path</label>
+                                    <input type="text" name="dohKeyPath" 
+                                           value="<%= settings.resolver?.doh?.keyPath || '/etc/ssl/private/doh.key' %>" 
+                                           class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                           placeholder="/path/to/key.pem">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- DoT Settings -->
+                        <div class="p-3 bg-green-50 rounded border-l-4 border-green-400">
+                            <div class="flex items-center justify-between mb-3">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-700">DNS over TLS (DoT)</p>
+                                    <p class="text-xs text-gray-600">Encrypt DNS queries over TLS</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" name="enableDoT" class="sr-only peer" <%= settings.resolver?.dot?.enabled ? 'checked' : '' %>>
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                                </label>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Port</label>
+                                    <input type="number" name="dotPort" 
+                                           value="<%= settings.resolver?.dot?.port || 853 %>" 
+                                           class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                                           min="1" max="65535">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Certificate Path</label>
+                                    <input type="text" name="dotCertPath" 
+                                           value="<%= settings.resolver?.dot?.certPath || '/etc/ssl/certs/dot.crt' %>" 
+                                           class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                                           placeholder="/path/to/cert.pem">
+                                </div>
+                                <div class="col-span-2">
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Private Key Path</label>
+                                    <input type="text" name="dotKeyPath" 
+                                           value="<%= settings.resolver?.dot?.keyPath || '/etc/ssl/private/dot.key' %>" 
+                                           class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                                           placeholder="/path/to/key.pem">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 
                 <div class="pt-4">
                     <button type="submit" class="btn btn-primary w-full" id="save-resolver-btn">
@@ -297,6 +504,63 @@
                     <a href="https://github.com/dionipe/ndash-bind" target="_blank" class="text-blue-600 hover:underline">
                         <i class="fab fa-github mr-1"></i>GitHub
                     </a>
+                </div>
+            </div>
+        <!-- SSL Certificate Management -->
+        <div class="content-card">
+            <h4 class="text-lg font-semibold text-gray-800 mb-4">
+                <i class="fas fa-certificate mr-2 text-green-600"></i>
+                SSL Certificate Management
+            </h4>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Certificate Status</label>
+                    <div id="ssl-status" class="text-sm text-gray-600 p-3 bg-gray-50 rounded">
+                        Checking...
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <button id="check-ssl-btn" class="btn btn-primary flex-1">
+                        <i class="fas fa-search mr-1"></i>Check Status
+                    </button>
+                    <button id="generate-ssl-btn" class="btn btn-success flex-1" style="display: none;">
+                        <i class="fas fa-certificate mr-1"></i>Generate SSL
+                    </button>
+                    <button id="delete-ssl-btn" class="btn btn-danger flex-1" style="display: none;">
+                        <i class="fas fa-trash mr-1"></i>Delete
+                    </button>
+                </div>
+
+                <!-- SSL Generation Form (hidden by default) -->
+                <div id="ssl-form" class="border-t pt-4 mt-4" style="display: none;">
+                    <h5 class="text-sm font-medium text-gray-700 mb-3">Generate Self-Signed Certificate</h5>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Common Name</label>
+                            <input type="text" id="ssl-common-name" value="localhost"
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Organization</label>
+                            <input type="text" id="ssl-organization" value="NDash DNS Server"
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Country Code</label>
+                            <input type="text" id="ssl-country" value="US" maxlength="2"
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Validity (days)</label>
+                            <input type="number" id="ssl-validity" value="365" min="1" max="3650"
+                                   class="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500">
+                        </div>
+                    </div>
+                    <button onclick="generateSSLCertificate()" class="btn btn-primary w-full mt-3">
+                        <i class="fas fa-certificate mr-1"></i>Generate Self-Signed SSL
+                    </button>
                 </div>
             </div>
         </div>
@@ -421,6 +685,149 @@ function showNotification(message, type) {
         setTimeout(() => notification.remove(), 500);
     }, 3000);
 }
+
+// SSL Certificate Management
+document.addEventListener('DOMContentLoaded', function() {
+    const checkSslBtn = document.getElementById('check-ssl-btn');
+    const generateSslBtn = document.getElementById('generate-ssl-btn');
+    const deleteSslBtn = document.getElementById('delete-ssl-btn');
+    const sslStatus = document.getElementById('ssl-status');
+
+    // Check SSL status on page load
+    checkSSLStatus();
+
+    // Check SSL status button
+    checkSslBtn.addEventListener('click', function() {
+        checkSSLStatus();
+    });
+
+    // Generate SSL certificate button
+    generateSslBtn.addEventListener('click', function() {
+        const sslForm = document.getElementById('ssl-form');
+        sslForm.style.display = sslForm.style.display === 'none' ? 'block' : 'none';
+    });
+
+    // Handle form submission for SSL generation
+    const sslFormElement = document.getElementById('ssl-form');
+    if (sslFormElement) {
+        const generateBtn = sslFormElement.querySelector('button[onclick="generateSSLCertificate()"]');
+        if (generateBtn) {
+            generateBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                generateSSLCertificate();
+            });
+        }
+    }
+
+    // Delete SSL certificates button
+    deleteSslBtn.addEventListener('click', function() {
+        if (confirm('Are you sure you want to delete the SSL certificates? This will disable DoH and DoT services.')) {
+            deleteSSLCertificates();
+        }
+    });
+
+    function checkSSLStatus() {
+        sslStatus.textContent = 'Checking...';
+        checkSslBtn.disabled = true;
+
+        fetch('/settings/ssl-info')
+            .then(response => response.json())
+            .then(data => {
+                if (data.certExists && data.keyExists) {
+                    sslStatus.innerHTML = `
+                        <span class="text-green-600 font-medium">✓ Certificates exist</span><br>
+                        <span class="text-xs">Subject: ${data.certInfo?.subject || 'Unknown'}</span><br>
+                        <span class="text-xs">Valid until: ${data.certInfo?.validTo || 'Unknown'}</span>
+                    `;
+                    generateSslBtn.style.display = 'none';
+                    deleteSslBtn.style.display = 'inline-block';
+                } else {
+                    sslStatus.innerHTML = `
+                        <span class="text-red-600 font-medium">✗ No certificates found</span><br>
+                        <span class="text-xs">Generate certificates to enable DoH/DoT</span>
+                    `;
+                    generateSslBtn.style.display = 'inline-block';
+                    deleteSslBtn.style.display = 'none';
+                }
+            })
+            .catch(error => {
+                sslStatus.innerHTML = `<span class="text-red-600">Error checking certificates</span>`;
+                console.error('SSL status check error:', error);
+            })
+            .finally(() => {
+                checkSslBtn.disabled = false;
+            });
+    }
+
+    function generateSSLCertificate() {
+        const commonName = document.getElementById('ssl-common-name').value;
+        const organizationName = document.getElementById('ssl-organization').value;
+        const countryCode = document.getElementById('ssl-country').value;
+        const validityDays = document.getElementById('ssl-validity').value;
+
+        generateSslBtn.disabled = true;
+        generateSslBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Generating...';
+
+        fetch('/settings/generate-ssl', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                commonName: commonName,
+                organizationName: organizationName,
+                countryCode: countryCode,
+                validityDays: validityDays
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('SSL certificates generated successfully!', 'success');
+                checkSSLStatus();
+            } else {
+                showNotification('Failed to generate SSL certificates: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            showNotification('Error generating SSL certificates', 'error');
+            console.error('SSL generation error:', error);
+        })
+        .finally(() => {
+            generateSslBtn.disabled = false;
+            generateSslBtn.innerHTML = '<i class="fas fa-certificate mr-1"></i>Generate Self-Signed SSL';
+        });
+    }
+
+    function deleteSSLCertificates() {
+        deleteSslBtn.disabled = true;
+        deleteSslBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Deleting...';
+
+        fetch('/settings/delete-ssl', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification(data.message, 'success');
+                checkSSLStatus();
+            } else {
+                showNotification('Failed to delete SSL certificates: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            showNotification('Error deleting SSL certificates', 'error');
+            console.error('SSL deletion error:', error);
+        })
+        .finally(() => {
+            deleteSslBtn.disabled = false;
+            deleteSslBtn.innerHTML = '<i class="fas fa-trash mr-1"></i>Delete Certificates';
+        });
+    }
+});
 </script>
 
 <%- include('../partials/footer-standalone') %>

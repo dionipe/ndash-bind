@@ -294,10 +294,180 @@ body {
     .table {
         font-size: 0.8125rem;
     }
-    
+
     .table th,
     .table td {
         padding: 0.5rem;
+    }
+
+    /* Mobile navigation adjustments */
+    .nav-item {
+        padding: 1rem;
+        font-size: 1rem;
+    }
+
+    .nav-item i {
+        width: 1.5rem;
+        margin-right: 1rem;
+        font-size: 1.25rem;
+    }
+
+    /* Quick action cards - stack better on mobile */
+    .quick-action-card {
+        padding: 1rem 0.75rem;
+    }
+
+    .quick-action-card i {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+
+    /* Stat cards - full width on mobile */
+    .stat-card {
+        padding: 1rem;
+    }
+
+    .stat-icon {
+        width: 2.5rem;
+        height: 2.5rem;
+    }
+
+    .stat-icon i {
+        font-size: 1.25rem;
+    }
+
+    /* Form improvements for mobile */
+    .form-input {
+        padding: 0.75rem;
+        font-size: 1rem; /* Prevent zoom on iOS */
+    }
+
+    /* Button improvements for touch */
+    .btn {
+        min-height: 44px; /* iOS touch target minimum */
+        padding: 0.75rem 1.5rem;
+        font-size: 1rem;
+    }
+
+    /* Content cards */
+    .content-card {
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    /* Activity items */
+    .activity-item {
+        padding: 0.75rem;
+    }
+
+    .activity-icon {
+        width: 2.5rem;
+        height: 2.5rem;
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 640px) {
+    /* Extra small screens */
+    .quick-action-card span {
+        font-size: 0.75rem;
+    }
+
+    .stat-card p:first-child {
+        font-size: 0.75rem;
+    }
+
+    .stat-card p:nth-child(2) {
+        font-size: 2rem;
+    }
+}
+
+/* Touch-friendly interactions */
+@media (hover: none) and (pointer: coarse) {
+    /* Remove hover effects on touch devices */
+    .nav-item:hover {
+        background-color: transparent;
+        color: #d1d5db;
+    }
+
+    .nav-item.active {
+        background-color: rgba(59, 130, 246, 0.15);
+        color: #60a5fa;
+    }
+
+    .quick-action-card:hover {
+        transform: none;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        border-color: #e5e7eb;
+    }
+
+    .stat-card:hover {
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    }
+
+    .btn:hover {
+        background: white;
+        border-color: #d1d5db;
+    }
+
+    .btn-primary:hover {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    }
+
+    .btn-danger:hover {
+        background: #ef4444;
+    }
+}
+
+/* Mobile menu animations */
+#sidebar {
+    transition: transform 0.3s ease-in-out;
+}
+
+#mobile-menu-overlay {
+    transition: opacity 0.3s ease-in-out;
+}
+
+/* Prevent horizontal scroll on mobile */
+@media (max-width: 768px) {
+    body {
+        overflow-x: hidden;
+    }
+
+    main {
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Ensure tables are fully responsive */
+    .table-responsive {
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Better spacing for mobile cards */
+    .content-card {
+        margin-bottom: 1rem;
+    }
+
+    /* Mobile-optimized form inputs */
+    .form-input, .form-select {
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+}
+
+/* Focus states for accessibility */
+.btn:focus, .nav-item:focus, .form-input:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .nav-item {
+        border: 1px solid #d1d5db;
+    }
+
+    .content-card {
+        border: 2px solid #d1d5db;
     }
 }
 

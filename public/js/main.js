@@ -1,18 +1,47 @@
 // Main JavaScript for NDash
 
+// Mobile menu functions
+function toggleMobileMenu() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('mobile-menu-overlay');
+
+    if (sidebar.classList.contains('-translate-x-full')) {
+        // Show menu
+        sidebar.classList.remove('-translate-x-full');
+        overlay.classList.remove('hidden');
+        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+    } else {
+        // Hide menu
+        sidebar.classList.add('-translate-x-full');
+        overlay.classList.add('hidden');
+        document.body.style.overflow = ''; // Restore scrolling
+    }
+}
+
+// Close mobile menu when clicking on a nav item
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize tooltips
     initTooltips();
-    
+
     // Auto-hide alerts
     autoHideAlerts();
-    
+
     // Confirm delete actions
     initDeleteConfirms();
-    
+
     // Real-time clock update
     updateClock();
     setInterval(updateClock, 1000);
+
+    // Close mobile menu when clicking nav items on mobile
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', function() {
+            if (window.innerWidth < 1024) { // lg breakpoint
+                toggleMobileMenu();
+            }
+        });
+    });
 });
 
 function initTooltips() {

@@ -64,6 +64,18 @@ async function startServer() {
         const zones = await bindService.listZones();
         console.log(`✓ Found ${zones.length} existing zone(s)`);
         
+        // Check resolver settings and start encrypted DNS if enabled
+        const settingsUtil = require('./utils/settings');
+        const settings = await settingsUtil.loadSettings();
+        if (settings.resolver?.enabled) {
+            if (settings.resolver.doh?.enabled || settings.resolver.dot?.enabled) {
+                console.log('🔧 Starting encrypted DNS services...');
+                const encryptedDnsService = require('./services/encryptedDnsService');
+                await encryptedDnsService.start();
+                console.log('✓ Encrypted DNS services started');
+            }
+        }
+        
         // Start Express server
         app.listen(PORT, () => {
             console.log('');
